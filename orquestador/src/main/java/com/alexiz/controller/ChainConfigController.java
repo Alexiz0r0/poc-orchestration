@@ -7,12 +7,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/config")
-public class ConfigController {
+@RequestMapping("/api/config/chain")
+public class ChainConfigController {
 
 	private final JdbcTemplate jdbcTemplate;
 
-	public ConfigController(JdbcTemplate jdbcTemplate) {
+	public ChainConfigController(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
 	}
 
