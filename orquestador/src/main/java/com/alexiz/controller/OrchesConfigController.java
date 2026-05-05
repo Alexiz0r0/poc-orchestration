@@ -15,7 +15,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import tools.jackson.databind.ObjectMapper;
 
 @RestController
-@RequestMapping("/api/config")
+@RequestMapping("/api/v2/config")
 public class OrchesConfigController {
 
 	private final JdbcTemplate jdbcTemplate;
