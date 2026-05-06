@@ -15,25 +15,40 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import tools.jackson.databind.ObjectMapper;
 
 @RestController
-@RequestMapping("/api/v3/config")
-public class OrchesV3ConfigController {
+@RequestMapping("/api/config")
+public class OrchesV4ConfigController {
 
 	private final JdbcTemplate jdbcTemplate;
 	private final ObjectMapper objectMapper;
 
-	public OrchesV3ConfigController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+	public OrchesV4ConfigController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
 		this.jdbcTemplate = jdbcTemplate;
 		this.objectMapper = objectMapper;
 	}
 
 	@PostMapping("/programar/{reportId}")
 	public String programarJob(@PathVariable String reportId, @RequestParam String spName,
-			@RequestParam(defaultValue = "5") int delaySeconds, // Por defecto 5 seg
+			@RequestParam(required = false) Integer delaySeconds, @RequestParam(required = false) String startTime,
+			// Formato "HH:mm" ej: "18:30"
 			@RequestBody Map<String, Object> params) throws JsonProcessingException {
 
 		String jsonParams = objectMapper.writeValueAsString(params);
+		long finalDelay = 0;
 
-		// 1. MERGE: Ahora incluimos el estado inicial 'PENDIENTE'
+		// LÓGICA DE TIEMPO DINÁMICA
+		if (startTime != null && !startTime.isEmpty()) {
+			// Situación: Horario específico (HH:mm)
+			finalDelay = calcularDelayHastaHora(startTime);
+		} else if (delaySeconds != null) {
+			// Situación: Ejecución con delay relativo
+			finalDelay = delaySeconds;
+		} else {
+			// Situación: Ejecución inmediata (le damos 2s para asegurar el COMMIT de la
+			// tabla)
+			finalDelay = 2;
+		}
+
+		// 1. MERGE en tabla de control (Igual que antes)
 		jdbcTemplate.update("""
 				MERGE INTO hr.report_jobs_config c
 				USING dual ON (c.report_id = ?)
@@ -44,10 +59,7 @@ public class OrchesV3ConfigController {
 				    VALUES (?, ?, ?, ?, 'PENDIENTE', SYSTIMESTAMP)
 				""", reportId, jsonParams, spName, reportId, "JOB_" + reportId, jsonParams, spName);
 
-		// 2. Lógica de Tiempo Dinámica
-		// Aquí podrías añadir lógica: si el usuario manda una hora fija, calculas la
-		// diferencia.
-		// Por ahora, usamos el delaySeconds solicitado.
+		// 2. Orquestación en Oracle
 		String jobName = "JOB_" + reportId;
 		String plsql = """
 				 BEGIN
@@ -59,13 +71,28 @@ public class OrchesV3ConfigController {
 				        job_action          => 'BEGIN hr.sp_master_orquestador(''' || ? || '''); END;',
 				        start_date          => SYSTIMESTAMP + NUMTODSINTERVAL(?, 'SECOND'),
 				        enabled             => TRUE,
-				        auto_drop           => TRUE -- Se elimina solo de Scheduler, no de nuestra tabla
+				        auto_drop           => TRUE
 				    );
 				END;
 				""";
 
-		jdbcTemplate.update(plsql, jobName, jobName, reportId, delaySeconds);
+		jdbcTemplate.update(plsql, jobName, jobName, reportId, finalDelay);
 
-		return "✅ Reporte [" + reportId + "] programado para iniciar en " + delaySeconds + " segundos.";
+		return "✅ Reporte [" + reportId + "] programado. Inicia en: " + finalDelay + " segundos.";
+	}
+
+	// Función auxiliar para calcular segundos faltantes hasta una hora HH:mm
+	private long calcularDelayHastaHora(String startTime) {
+		java.time.LocalTime now = java.time.LocalTime.now();
+		java.time.LocalTime target = java.time.LocalTime.parse(startTime);
+
+		java.time.Duration duration = java.time.Duration.between(now, target);
+
+		// Si la hora ya pasó hoy, se programa para mañana
+		if (duration.isNegative()) {
+			duration = duration.plusDays(1);
+		}
+
+		return duration.getSeconds();
 	}
 }
