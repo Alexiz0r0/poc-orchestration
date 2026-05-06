@@ -28,7 +28,7 @@ curl --location 'http://localhost:8087/api/config/programar/REP_MIGRACION_SALARI
 ## Situación 1: Ejecución Inmediata
 No envías ni delaySeconds ni startTime. El sistema asume el delay mínimo de seguridad.
 
-```sql
+```shell
 curl -X POST "http://localhost:8087/api/config/programar/REP_NOW?spName=hr.sp_migrar_datos" \
      -H "Content-Type: application/json" -d '{"salary": 5000}'
 
@@ -37,7 +37,7 @@ curl -X POST "http://localhost:8087/api/config/programar/REP_NOW?spName=hr.sp_mi
 ## Situación 2: Ejecución con Delay (ej: 2 minutos)
 Envías el parámetro delaySeconds.
 
-```sql
+```shell
 curl -X POST "http://localhost:8087/api/config/programar/REP_DELAY?spName=hr.sp_migrar_datos&delaySeconds=120" \
      -H "Content-Type: application/json" -d '{"salary": 5000}'
 
@@ -47,7 +47,7 @@ curl -X POST "http://localhost:8087/api/config/programar/REP_DELAY?spName=hr.sp_
 Envías el parámetro startTime en formato 24h.
 
 
-```sql
+```shell
 curl -X POST "http://localhost:8087/api/config/programar/REP_HORARIO?spName=hr.sp_migrar_datos&startTime=23:00" \
      -H "Content-Type: application/json" -d '{"salary": 5000}'
 
